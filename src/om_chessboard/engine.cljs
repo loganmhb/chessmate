@@ -1,24 +1,31 @@
 (ns om-chessboard.engine
-  (:require [cljs.core.async :as async]))
+  (:require [cljs.core.async :as async])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 (defn stockfish
-  "Starts a Web Worker running Stockfish.js."
+  "Starts a Web Worker running Stockfish.js, posting messages from the
+  provided channel. Returns a channel where it will deliver messages
+  from Stockfish."
   []
   (let [stockfish (js/Worker. "js/stockfish.js")
         input-chan (async/chan 100)
         output-chan (async/chan 100)]
-    (async/go-loop (.postMessage stockfish (async/<! input-chan)))
-    (.onmessage stockfish (fn [e] (async/go (async/>! e output-chan))))))
+    (set! (.-onmessage stockfish)
+          (fn [e]
+            (go (async/>! output-chan (.-data e)))))
+    (go-loop []
+      (.postMessage stockfish (async/<! input-chan))
+      (recur))
+    {:output-chan output-chan
+     :input-chan input-chan}))
 
-;;; interfact primitives
+(defn send! [engine msg]
+  (go (async/>! (:input-chan engine) msg)))
 
-(defn post-message [msg]
-  (.postMessage stockfish msg))
+(defn setup-engine! [engine]
+  (send! engine "setoption name MultiPV value 50")
+  (send! engine "isready"))
 
-(defn on-message [handler]
-  (.onmessage stockfish handler))
-
-(def input-chan (async/chan))
-
-(def output-chan (async/chan))
-
+(defn find-best-move! [engine position]
+  (send! engine (str "position fen " position))
+  (send! engine "go depth 8"))

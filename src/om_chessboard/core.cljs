@@ -3,8 +3,10 @@
             [om.next :as om :refer-macros [defui]]
             [om.dom :as dom]
             [clojure.string :as str]
+            [cljs.core.async :as async]
             [om-chessboard.engine :as engine]
-            [om-chessboard.game :as game]))
+            [om-chessboard.game :as game])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 (enable-console-print!)
 
@@ -18,7 +20,6 @@
                     :onDragStart (fn []
                                    (om/update-state! component merge
                                                      {:moving-from (str file rank)}))
-                    :onDragEnd (fn [] (println "done dragging"))
                     :style #js {:height size
                                 :width size}}))))
 
@@ -93,11 +94,25 @@
 
 (def start-pos "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
-
-;; Wiring -- remove eventually
-
 (def app-state (atom {:chessboard/position start-pos
                       :player/side :white}))
+
+(def engine (engine/stockfish))
+
+(go-loop []
+  (let [uci-message (async/<! (:output-chan engine))
+        st @app-state]
+    (println uci-message)
+    (if (.startsWith uci-message "bestmove")
+      (let [rm (second (str/split uci-message #" "))
+            move-obj (clj->js {:from (.substring rm 0 2)
+                               :to (.substring rm 2 4)})
+            new-pos (game/make-move (:chessboard/position st)
+                                    move-obj)]
+        (println move-obj)
+        (println new-pos)
+        (swap! app-state assoc :chessboard/position new-pos)))
+    (recur)))
 
 (defn read [{:keys [state] :as env} key params]
   {:value  (get @state key :not-found)})
@@ -106,17 +121,21 @@
 
 (defmethod mutate 'chessboard/attempt-move
   [{:keys [state] :as env} key params]
-  (if-let [new-pos (game/make-move (:chessboard/position @state) params)]
-    {:value [:chessboard/position]
-     :action #(swap! state assoc :chessboard/position new-pos)}))
-
-(defmethod mutate 'game/update
-  [{:keys [state]} key params]
-  {:value [:chessboard/position]
-   :action #(swap! state merge params)})
+  (let [position (:chessboard/position @state)
+        player-side (:player/side @state)]
+    ;; Only allow a move from dragging a piece if it's the player's turn
+    ;; and the move is legal
+    (if-let [new-pos (and (= (game/side-to-move position) player-side)
+                          (game/make-move position params))]
+      {:value [:chessboard/position]
+       :action #(do
+                  (engine/find-best-move! engine new-pos)
+                  (swap! state assoc :chessboard/position new-pos))})))
 
 (def parser (om/parser {:read read :mutate mutate}))
 
 (def reconciler (om/reconciler {:state app-state :parser parser}))
 
 (om/add-root! reconciler Chessboard (gdom/getElement "app"))
+
+(engine/setup-engine! engine)
