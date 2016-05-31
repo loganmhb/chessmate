@@ -1,4 +1,4 @@
-(defproject om-chessboard "0.1.0-SNAPSHOT"
+(defproject chessmate "0.1.0-SNAPSHOT"
   :description "A reactive chessboard implemented with Om Next"
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.170"]

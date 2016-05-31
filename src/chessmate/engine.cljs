@@ -1,4 +1,4 @@
-(ns om-chessboard.engine
+(ns chessmate.engine
   (:require [cljs.core.async :as async])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
