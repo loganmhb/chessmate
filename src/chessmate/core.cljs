@@ -165,8 +165,7 @@
   (render [this]
     (let [props (om/props this)]
       (dom/div nil
-               (board/chessboard {:chessboard/position (:chessboard/position props)
-                                  :player/side (:player/side props)})
+               (board/chessboard props)
                (controls/control-panel props)))))
 
 (om/add-root! reconciler Root (gdom/getElement "app"))
