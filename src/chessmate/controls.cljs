@@ -15,9 +15,17 @@
                                 :margin "10px"
                                 :padding "10px"}}
                "Player side:  "
-               (dom/select #js {:defaultValue "White"}
+               (dom/select #js {:id "side-select"
+                                :defaultValue "White"}
                            (dom/option #js {:value "white"} "White")
                            (dom/option #js {:value "black"} "Black"))
-               (dom/button #js {} "New Game")))))
+               (dom/button
+                #js {:onClick
+                     #(om/transact this
+                                   `[(controls/new-game
+                                      {:player/side ~(keyword
+                                                      (.-value
+                                                       (gdom/getElement "side-select")))})])}
+                "New Game")))))
 
 (def control-panel (om/factory ControlPanel))

@@ -28,4 +28,4 @@
 
 (defn find-best-move! [engine position]
   (send! engine (str "position fen " position))
-  (send! engine "go depth 8"))
+  (send! engine "go depth 10"))

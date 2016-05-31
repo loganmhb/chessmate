@@ -8,7 +8,8 @@
             [chessmate.ratings :as ratings]
             [chessmate.game :as game]
             [chessmate.board :as board]
-            [chessmate.controls :as controls])
+            [chessmate.controls :as controls]
+            [clojure.set :as set])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 
@@ -125,6 +126,7 @@
 
 
 (defmethod mutate 'engine/make-move
+  ;; Should only be called when we get a "bestmove" from Stockfish
   [{:keys [state] :as env} key params]
   {:value [:chessboard/position]
    :action #(let [position (:chessboard/position @state)
@@ -138,6 +140,16 @@
               (swap! state assoc :chessboard/position
                      (game/make-move position {:from (subs move 0 2)
                                                :to (subs move 2 4)})))})
+
+(defmethod mutate 'controls/new-game
+  [{:keys [state] :as env} key params]
+  (let [player-side (:player/side params)]
+    {:value [:chessboard/position :engine/evaluations]
+     :action #(do (swap! state merge {:engine/evaluations {}
+                                      :chessboard/position start-pos
+                                      :player/side player-side})
+                  (when (= player-side :black)
+                    (engine/find-best-move! engine start-pos)))}))
 
 
 (def parser (om/parser {:read read :mutate mutate}))
@@ -153,11 +165,11 @@
   (render [this]
     (let [props (om/props this)]
       (dom/div nil
-               (board/chessboard {:chessboard/position
-                                  (:chessboard/position props)})
+               (board/chessboard {:chessboard/position (:chessboard/position props)
+                                  :player/side (:player/side props)})
                (controls/control-panel props)))))
 
-(om/add-root! reconciler board/Chessboard (gdom/getElement "app"))
+(om/add-root! reconciler Root (gdom/getElement "app"))
 
 (listen-for-engine-moves!)
 

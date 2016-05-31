@@ -53,36 +53,45 @@
       expand-numbers
       (str/split "/")))
 
-(defn row [component rank pattern width pieces]
+(defn row [component rank pattern width pieces reverse?]
   (let [square-size (quot width 8)]
     (dom/div #js {:style #js {:height square-size
                               :width width}
                   :key rank}
-             (map square
-                  (repeat component)
-                  (repeat square-size)
-                  (cycle pattern)
-                  (repeat rank)
-                  "abcdefgh"
-                  pieces))))
+             (let [rendered-row (map square
+                                     (repeat component)
+                                     (repeat square-size)
+                                     (cycle pattern)
+                                     (repeat rank)
+                                     "abcdefgh"
+                                     pieces)]
+               (if reverse?
+                 (reverse rendered-row)
+                 rendered-row)))))
 
 (defui Chessboard
   static om/IQuery
-  (query [this] [:chessboard/position])
+  (query [this] [:chessboard/position :player/side])
   Object
   (render [this]
     (let [props (om/props this)
-          width 400] ;; FIXME: responsive width
+          width 400
+          board (take 8 (map row
+                             (repeat this)
+                             (reverse (range 1 9))
+                             (cycle [[:white :black] [:black :white]])
+                             (repeat 400)
+                             (fen->rows (:chessboard/position props))
+                             (if (= (:player/side props) :black)
+                               (repeat true)
+                               (repeat false))))] ;; FIXME: responsive width
       (println props)
       (dom/div #js {:style #js {:border "2px solid"
                                 :width width
                                 :height width}}
-               (take 8 (map row
-                            (repeat this)
-                            (reverse (range 1 9))
-                            (cycle [[:white :black] [:black :white]])
-                            (repeat 400)
-                            (fen->rows (:chessboard/position props))))))))
+               (if (= (:player/side props) :black)
+                 (reverse board)
+                 board)))))
 
 
 (def chessboard (om/factory Chessboard))
